@@ -56,12 +56,15 @@ final class ShelfUITests: XCTestCase {
         let field = app.searchFields.firstMatch
         if field.waitForExistence(timeout: 5) {
             field.tap()
-            field.typeText("불편한 편의점")
+            field.typeText("불편한 편의점\n")
             sleep(2)
             shot("06-search")
             let result = app.buttons.containing(NSPredicate(format: "label CONTAINS '불편한'")).firstMatch
             if result.waitForExistence(timeout: 5) {
+                sleep(1)
                 result.tap()
+                sleep(3)
+                if result.exists && result.isHittable { result.tap() }
                 sleep(25)
                 shot("07-epub-reader")
                 app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
