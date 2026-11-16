@@ -194,7 +194,7 @@ struct ReaderBody: View {
         .sheet(item: $sheet) { s in
             switch s {
             case .contents: ContentsSheet(model: model)
-            case .settings: AppearanceSheet(model: model).presentationDetents([.height(epub != nil ? 470 : 360)])
+            case .settings: AppearanceSheet(model: model).presentationDetents(epub != nil ? [.height(520), .large] : [.height(360)])
             case .search: SearchSheet(model: model)
             }
         }
@@ -245,7 +245,7 @@ struct ReaderBody: View {
                     }
                 }
                 Button { sheet = .search } label: { Image(systemName: "magnifyingglass") }
-                Button { sheet = .settings } label: { Image(systemName: "textformat.size") }
+                Button { sheet = .settings } label: { Image(systemName: "textformat.size") }.accessibilityLabel("보기 설정")
                 Button { model.toggleBookmark() } label: {
                     Image(systemName: model.currentBookmark != nil ? "bookmark.fill" : "bookmark")
                         .foregroundStyle(model.currentBookmark != nil ? Color.red : Color.primary)
@@ -600,6 +600,30 @@ struct AppearanceSheet: View {
                     HStack {
                         Text("여백").font(.subheadline)
                         Slider(value: Binding(get: { s.epubMargin }, set: { s.epubMargin = $0 }), in: 8...56, step: 4, onEditingChanged: { e in if !e { model.applyAppearance() } })
+                    }
+                    Picker("정렬", selection: Binding(get: { s.epubJustify }, set: { s.epubJustify = $0; model.applyAppearance() })) {
+                        Text("양쪽 정렬").tag(true)
+                        Text("왼쪽 정렬").tag(false)
+                    }
+                    .pickerStyle(.segmented)
+                    Toggle(isOn: Binding(get: { s.epubKeepWords }, set: { s.epubKeepWords = $0; model.applyAppearance() })) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("단어 단위로 줄바꿈")
+                            Text(s.epubKeepWords ? "단어가 잘리지 않지만 양쪽 정렬이면 띄어쓰기가 벌어질 수 있어요" : "글자 단위로 줄을 바꿔 띄어쓰기 폭이 고르게 유지돼요")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    HStack {
+                        Text("띄어쓰기").font(.subheadline)
+                        Slider(value: Binding(get: { s.epubWordSpacing }, set: { s.epubWordSpacing = $0 }), in: -0.2...0.4, step: 0.05, onEditingChanged: { e in if !e { model.applyAppearance() } })
+                    }
+                    HStack {
+                        Text("글자 간격").font(.subheadline)
+                        Slider(value: Binding(get: { s.epubLetterSpacing }, set: { s.epubLetterSpacing = $0 }), in: -0.05...0.1, step: 0.01, onEditingChanged: { e in if !e { model.applyAppearance() } })
+                    }
+                    if s.epubWordSpacing != 0 || s.epubLetterSpacing != 0 {
+                        Button("간격 기본값으로") { s.epubWordSpacing = 0; s.epubLetterSpacing = 0; model.applyAppearance() }
+                            .font(.subheadline)
                     }
                 }
                 Toggle("가장자리 탭으로 넘기기", isOn: $s.tapToTurn)

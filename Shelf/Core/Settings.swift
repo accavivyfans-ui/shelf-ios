@@ -80,7 +80,7 @@ enum EpubFont: String, Codable, CaseIterable, Identifiable {
     var css: String {
         switch self {
         case .publisher: return ""
-        case .myungjo: return "'AppleMyungjo', 'Nanum Myeongjo', serif"
+        case .myungjo: return "'NanumMyeongjo', 'Nanum Myeongjo', 'AppleMyungjo', serif"
         case .gothic: return "-apple-system, 'Apple SD Gothic Neo', sans-serif"
         }
     }
@@ -102,6 +102,10 @@ final class AppSettings: ObservableObject {
     @Published var epubFontSize: Double { didSet { save() } }
     @Published var epubLineHeight: Double { didSet { save() } }
     @Published var epubMargin: Double { didSet { save() } }
+    @Published var epubJustify: Bool { didSet { save() } }
+    @Published var epubKeepWords: Bool { didSet { save() } }
+    @Published var epubWordSpacing: Double { didSet { save() } }   // em, added to the font's own space
+    @Published var epubLetterSpacing: Double { didSet { save() } } // em
     @Published var gridStyle: Bool { didSet { save() } }
 
     private var loading = true
@@ -115,11 +119,24 @@ final class AppSettings: ObservableObject {
         pdfLayout = PDFLayout(rawValue: d.string(forKey: "pdfLayout") ?? "") ?? .paged
         tapToTurn = d.object(forKey: "tapToTurn") as? Bool ?? true
         keepAwake = d.object(forKey: "keepAwake") as? Bool ?? true
-        epubFont = EpubFont(rawValue: d.string(forKey: "epubFont") ?? "") ?? .myungjo
+        // AppleMyungjo's spaces are very wide, so the book's own (e-book) font is the default now.
+        epubFont = EpubFont(rawValue: d.string(forKey: "epubFont2") ?? "") ?? .publisher
         epubFontSize = d.object(forKey: "epubFontSize") as? Double ?? 18
         epubLineHeight = d.object(forKey: "epubLineHeight") as? Double ?? 1.7
         epubMargin = d.object(forKey: "epubMargin") as? Double ?? 24
         gridStyle = d.object(forKey: "gridStyle") as? Bool ?? false
+        epubJustify = d.object(forKey: "epubJustify") as? Bool ?? true
+        epubKeepWords = d.object(forKey: "epubKeepWords") as? Bool ?? false
+        epubWordSpacing = d.object(forKey: "epubWordSpacing") as? Double ?? 0
+        epubLetterSpacing = d.object(forKey: "epubLetterSpacing") as? Double ?? 0
+        // UI tests compare typesetting variants.
+        switch ProcessInfo.processInfo.environment["SHELF_EPUB_VARIANT"] {
+        case "legacy": epubFont = .myungjo
+        case "keep": epubKeepWords = true
+        case "left": epubJustify = false; epubKeepWords = true
+        case "gothic": epubFont = .gothic
+        default: break
+        }
         loading = false
     }
 
@@ -132,7 +149,11 @@ final class AppSettings: ObservableObject {
         d.set(pdfLayout.rawValue, forKey: "pdfLayout")
         d.set(tapToTurn, forKey: "tapToTurn")
         d.set(keepAwake, forKey: "keepAwake")
-        d.set(epubFont.rawValue, forKey: "epubFont")
+        d.set(epubFont.rawValue, forKey: "epubFont2")
+        d.set(epubJustify, forKey: "epubJustify")
+        d.set(epubKeepWords, forKey: "epubKeepWords")
+        d.set(epubWordSpacing, forKey: "epubWordSpacing")
+        d.set(epubLetterSpacing, forKey: "epubLetterSpacing")
         d.set(epubFontSize, forKey: "epubFontSize")
         d.set(epubLineHeight, forKey: "epubLineHeight")
         d.set(epubMargin, forKey: "epubMargin")

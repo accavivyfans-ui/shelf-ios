@@ -79,4 +79,34 @@ final class ShelfUITests: XCTestCase {
             }
         }
     }
+
+    /// Opens a body chapter of the EPUB under several typesetting variants for comparison.
+    func testTypesetting() {
+        for variant in ["default", "legacy", "keep", "left", "gothic"] {
+            app.terminate()
+            app.launchEnvironment["SHELF_EPUB_VARIANT"] = variant
+            app.launchEnvironment["SHELF_EPUB_CHAPTER"] = "7"
+            app.launch()
+            app.tabBars.buttons["검색"].tap()
+            let field = app.textFields.firstMatch
+            guard field.waitForExistence(timeout: 10) else { continue }
+            field.tap()
+            field.typeText("불편한 편의점\n")
+            sleep(2)
+            let result = app.buttons.containing(NSPredicate(format: "label CONTAINS '불편한'")).firstMatch
+            guard result.waitForExistence(timeout: 10) else { continue }
+            sleep(1)
+            result.tap()
+            sleep(3)
+            if result.exists && result.isHittable { result.tap() }
+            sleep(variant == "default" ? 25 : 8)
+            shot("T-\(variant)")
+            if variant == "default" {
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+                sleep(1)
+                let aa = app.buttons["보기 설정"]
+                if aa.waitForExistence(timeout: 3) { aa.tap(); sleep(2); shot("T-sheet") }
+            }
+        }
+    }
 }

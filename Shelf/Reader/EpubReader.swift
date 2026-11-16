@@ -98,6 +98,10 @@ final class EpubReaderModel: ReaderModel, WKNavigationDelegate, UIScrollViewDele
         if entries.isEmpty { entries = b.chapters.map { TocEntry(label: $0.title, depth: 0, page: $0.index + 1, pageLabel: "\($0.index + 1)장") } }
         chapter = max(0, min(b.chapters.count - 1, state.page - 1))
         pending = .ratio(state.ratio)
+        if let c = ProcessInfo.processInfo.environment["SHELF_EPUB_CHAPTER"].flatMap(Int.init), b.chapters.indices.contains(c) {
+            chapter = c
+            pending = .ratio(0)
+        }
         self.state.pageCount = b.chapters.count
         applyAppearance()
     }
@@ -326,7 +330,9 @@ final class EpubReaderModel: ReaderModel, WKNavigationDelegate, UIScrollViewDele
         let c = s.theme.css
         let cfg: [String: Any] = [
             "bg": c.bg, "fg": c.fg, "link": c.link, "themed": s.theme != .light,
-            "font": s.epubFont.css, "size": s.epubFontSize, "line": s.epubLineHeight, "margin": s.epubMargin,
+            "font": s.epubFont.css, "size": s.epubFontSize,
+            "justify": s.epubJustify, "keep": s.epubKeepWords, "ws": s.epubWordSpacing, "ls": s.epubLetterSpacing,
+            "legacy": ProcessInfo.processInfo.environment["SHELF_EPUB_VARIANT"] == "legacy", "line": s.epubLineHeight, "margin": s.epubMargin,
             "top": 52, "bottom": 46,
         ]
         let d = (try? JSONSerialization.data(withJSONObject: cfg)) ?? Data("{}".utf8)
@@ -500,6 +506,20 @@ final class EpubReaderModel: ReaderModel, WKNavigationDelegate, UIScrollViewDele
           'mark[data-shelf]{color:inherit !important;border-radius:2px;padding:0 1px;}' +
           'mark.shelf-find{background:rgba(255,214,0,.7) !important;color:inherit !important;}';
         if (c.font) s += 'body,p,div,span,li,dd,dt,blockquote,td,th{font-family:' + c.font + ' !important;}';
+        if (!c.legacy) {
+          // Typesetting: the publisher CSS often forces justify + break-all, which on a narrow
+          // phone column either chops words or stretches spaces. Override with reader settings.
+          markAligned();
+          var T = 'p,li,blockquote,dd,dt,div,td,th,span,a,em,strong,b,i';
+          s += T.split(',').map(function(t){ return 'body ' + t; }).join(',') + ',body{' +
+            'word-break:' + (c.keep ? 'keep-all' : 'normal') + ' !important;' +
+            'overflow-wrap:' + (c.keep ? 'anywhere' : 'break-word') + ' !important;' +
+            'line-break:' + (c.keep ? 'auto' : 'loose') + ' !important;' +
+            'word-spacing:' + c.ws + 'em !important;letter-spacing:' + c.ls + 'em !important;' +
+            'text-rendering:optimizeLegibility;font-kerning:normal;}' +
+            ['p','li','blockquote','dd','div'].map(function(t){ return 'body ' + t + ':not([data-shelf-al])'; }).join(',') +
+            '{text-align:' + (c.justify ? 'justify' : 'start') + ' !important;text-justify:' + (c.keep ? 'inter-word' : 'inter-character') + ' !important;}';
+        }
         if (c.themed) s += 'html,body{color:' + c.fg + ' !important;}body *{color:' + c.fg + ' !important;background-color:transparent !important;border-color:' + c.fg + '44 !important;}a,a *{color:' + c.link + ' !important;}';
         else s += 'html{color:' + c.fg + ';}';
         return s;
@@ -521,6 +541,18 @@ final class EpubReaderModel: ReaderModel, WKNavigationDelegate, UIScrollViewDele
         Promise.race([Promise.all(waits.concat([fonts])), timeout]).then(function(){
           requestAnimationFrame(function(){ requestAnimationFrame(cb); });
         });
+      }
+
+      // Remember blocks the book centres or right-aligns, before our overrides apply.
+      var alignedMarked = false;
+      function markAligned(){
+        if (alignedMarked || !document.body) return;
+        alignedMarked = true;
+        var els = document.body.querySelectorAll('p,li,blockquote,dd,div,h1,h2,h3,h4,h5,h6');
+        for (var i = 0; i < els.length; i++) {
+          var a = getComputedStyle(els[i]).textAlign;
+          if (a === 'center' || a === 'right' || a === 'end' || a === '-webkit-center') els[i].setAttribute('data-shelf-al', '1');
+        }
       }
 
       function relayout(){
