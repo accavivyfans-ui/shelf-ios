@@ -512,7 +512,7 @@ final class EpubReaderModel: ReaderModel, WKNavigationDelegate, UIScrollViewDele
           markAligned();
           var T = 'p,li,blockquote,dd,dt,div,td,th,span,a,em,strong,b,i';
           s += T.split(',').map(function(t){ return 'body ' + t; }).join(',') + ',body{' +
-            'word-break:' + (c.keep ? 'keep-all' : 'normal') + ' !important;' +
+            'word-break:' + (c.keep ? 'keep-all' : 'break-all') + ' !important;' +
             'overflow-wrap:' + (c.keep ? 'anywhere' : 'break-word') + ' !important;' +
             'line-break:' + (c.keep ? 'auto' : 'loose') + ' !important;' +
             'word-spacing:' + c.ws + 'em !important;letter-spacing:' + c.ls + 'em !important;' +

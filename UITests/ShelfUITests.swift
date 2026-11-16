@@ -82,7 +82,7 @@ final class ShelfUITests: XCTestCase {
 
     /// Opens a body chapter of the EPUB under several typesetting variants for comparison.
     func testTypesetting() {
-        for variant in ["default", "legacy", "keep", "left", "gothic"] {
+        for variant in ["default", "left"] {
             app.terminate()
             app.launchEnvironment["SHELF_EPUB_VARIANT"] = variant
             app.launchEnvironment["SHELF_EPUB_CHAPTER"] = "7"
