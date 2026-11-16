@@ -6,17 +6,23 @@ import UIKit
 final class Opener: ObservableObject {
     static let shared = Opener()
     @Published var file: BookFile?
-    /// An active search bar is itself presented modally, which blocks our full-screen
-    /// reader, so close it first.
+    /// An active search bar blocks our full-screen reader, so close it first.
     func open(_ f: BookFile) {
         let window = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first
-        var top = window?.rootViewController
-        while let next = top?.presentedViewController { top = next }
-        if let search = top as? UISearchController {
-            search.dismiss(animated: true) { self.file = f }
+        if let search = Self.activeSearch(window?.rootViewController) {
+            search.isActive = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { self.file = f }
             return
         }
         file = f
+    }
+
+    private static func activeSearch(_ vc: UIViewController?) -> UISearchController? {
+        guard let vc else { return nil }
+        if let s = vc as? UISearchController, s.isActive { return s }
+        if let s = vc.navigationItem.searchController, s.isActive { return s }
+        for c in vc.children { if let s = activeSearch(c) { return s } }
+        return activeSearch(vc.presentedViewController)
     }
 }
 
