@@ -1,0 +1,4 @@
+*.xcodeproj
+build/
+output/
+Shelf/Info.plist

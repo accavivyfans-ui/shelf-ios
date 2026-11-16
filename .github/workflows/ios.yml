@@ -1,0 +1,65 @@
+name: Build iPhone IPA
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Build device app
+        run: xcodebuild -project Shelf.xcodeproj -scheme Shelf -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - name: Select iPhone simulator
+        id: simulator
+        run: |
+          xcrun simctl list devices available -j > /tmp/devices.json
+          python3 -c 'import json,os; d=json.load(open("/tmp/devices.json")); v=next(x for a in d["devices"].values() for x in a if "iPhone" in x["name"]); open(os.environ["GITHUB_OUTPUT"],"a").write("id="+v["udid"]+"\n")'
+      - name: Tour the app on a simulator (library, exams, PDF, EPUB)
+        env:
+          SHELF_SHARE: ${{ secrets.SHELF_SHARE }}
+          TEST_RUNNER_SHELF_SHARE: ${{ secrets.SHELF_SHARE }}
+        run: xcodebuild test -project Shelf.xcodeproj -scheme Shelf -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}' -derivedDataPath simulator-build -resultBundlePath UITestResults.xcresult -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO
+        continue-on-error: true
+      - name: Export iPhone screenshots
+        if: always()
+        run: |
+          if [ -d UITestResults.xcresult ]; then
+            xcrun xcresulttool export attachments --path UITestResults.xcresult --output-path screenshots
+          fi
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iPhone-screenshots
+          path: screenshots
+      - name: Upload iPhone UI test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iPhone-UI-test-results
+          path: UITestResults.xcresult
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p output/Payload
+          cp -R build/Build/Products/Release-iphoneos/Shelf.app output/Payload/
+          cd output
+          zip -r Shelf-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Shelf-unsigned-IPA
+          path: output/Shelf-unsigned.ipa
+      - name: Publish IPA to the "latest" release (direct .ipa download, no zip)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(grep MARKETING_VERSION project.yml | head -1 | sed "s/.*'\(.*\)'.*/\1/")
+          cp output/Shelf-unsigned.ipa "output/Shelf-$VERSION.ipa"
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest "output/Shelf-$VERSION.ipa" --title "Shelf $VERSION" --notes "서재 앱 · 서명 안 된 IPA · 빌드 ${{ github.run_number }} · ${{ github.sha }}" --latest
