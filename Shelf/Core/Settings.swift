@@ -107,7 +107,7 @@ final class AppSettings: ObservableObject {
 
     private init() {
         if let data = d.data(forKey: "share"), let s = try? JSONDecoder().decode(ShareLink.self, from: data) { share = s }
-        else { share = ProcessInfo.processInfo.environment["SHELF_SHARE"].flatMap { ShareLink(string: $0) } }
+        else { share = ProcessInfo.processInfo.environment["SHELF_SHARE"].flatMap { ShareLink(string: $0) } ?? ShareLink(string: BuildConfig.share) }
         studyOSAddress = d.string(forKey: "studyOS") ?? "http://100.84.240.95:3000"
         syncEnabled = ProcessInfo.processInfo.environment["SHELF_NOSYNC"] != nil ? false : (d.object(forKey: "sync") as? Bool ?? true)
         theme = ReaderTheme(rawValue: d.string(forKey: "theme") ?? "") ?? .light

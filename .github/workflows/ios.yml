@@ -12,6 +12,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
         run: brew install xcodegen
+      - name: Bake in the share link
+        env:
+          SHELF_SHARE: ${{ secrets.SHELF_SHARE }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          v = os.environ.get("SHELF_SHARE", "")
+          open("Shelf/Core/BuildConfig.swift", "w").write("enum BuildConfig {\n    static let share = " + json.dumps(v) + "\n}\n")
+          PY
       - name: Generate project
         run: xcodegen generate
       - name: Build device app
