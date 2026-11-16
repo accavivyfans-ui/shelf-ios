@@ -44,7 +44,10 @@ struct ExamFinderView: View {
                     let papers = entry.value
                     Section {
                         VStack(spacing: 0) {
-                            ForEach(papers.sorted { $0.label.localizedStandardCompare($1.label) == .orderedAscending }) { p in
+                            ForEach(papers.sorted { a, b in
+                                let ia = Subjects.order.firstIndex(of: a.subject) ?? 99, ib = Subjects.order.firstIndex(of: b.subject) ?? 99
+                                return ia != ib ? ia < ib : a.label.localizedStandardCompare(b.label) == .orderedAscending
+                            }) { p in
                                 ExamRow(paper: p, answer: catalog.answer(for: p.file))
                                 Divider().padding(.leading, 16)
                             }

@@ -13,7 +13,7 @@ final class RangeReader {
     private let budget: Int
     private(set) var failed = false
 
-    init(url: URL, size: Int, budget: Int = 6 * 1024 * 1024) {
+    init(url: URL, size: Int, budget: Int = 16 * 1024 * 1024) {
         self.url = url
         self.size = size
         self.budget = budget
