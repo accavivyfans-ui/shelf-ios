@@ -236,11 +236,12 @@ final class NasOps: ObservableObject {
         picking = true
     }
 
-    func picked(_ result: Result<[URL], Error>) {
-        switch result {
-        case .success(let urls): upload(urls, to: pickTarget)
-        case .failure(let e): message = "파일을 열지 못했어요: \(e.localizedDescription)"
-        }
+    /// Files chosen in the document picker (already copied into the app).
+    func picked(_ urls: [URL]) {
+        picking = false
+        let books = urls.filter { ["pdf", "epub"].contains($0.pathExtension.lowercased()) }
+        if books.count < urls.count { message = "PDF와 EPUB만 올릴 수 있어요. 다른 파일은 건너뛰었어요." }
+        if !books.isEmpty { upload(books, to: pickTarget) }
     }
 
     struct Upload: Identifiable, Equatable {
@@ -372,6 +373,28 @@ struct NasLoginView: View {
     }
 }
 
+/// The system document picker. Copies the chosen files into the app (no folder permissions to keep)
+/// and accepts every file so an EPUB the system does not tag as EPUB is not greyed out.
+struct DocumentPicker: UIViewControllerRepresentable {
+    let done: ([URL]) -> Void
+    let cancel: () -> Void
+    func makeCoordinator() -> Coordinator { Coordinator(done: done, cancel: cancel) }
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.pdf, .epub, .item], asCopy: true)
+        picker.allowsMultipleSelection = true
+        picker.delegate = context.coordinator
+        return picker
+    }
+    func updateUIViewController(_ controller: UIDocumentPickerViewController, context: Context) {}
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let done: ([URL]) -> Void
+        let cancel: () -> Void
+        init(done: @escaping ([URL]) -> Void, cancel: @escaping () -> Void) { self.done = done; self.cancel = cancel }
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) { done(urls) }
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { cancel() }
+    }
+}
+
 /// Upload progress and results, pinned above the tab bar.
 struct NasStatusBar: View {
     @ObservedObject private var ops = NasOps.shared
@@ -414,6 +437,9 @@ struct NasStatusBar: View {
         .padding(.bottom, 56)
         .animation(.default, value: ops.uploads)
         .animation(.default, value: ops.message)
+        .sheet(isPresented: $ops.picking) {
+            DocumentPicker(done: { ops.picked($0) }, cancel: { ops.picking = false }).ignoresSafeArea()
+        }
     }
 }
 
