@@ -62,6 +62,8 @@ struct SettingsView: View {
     @ObservedObject private var sync = SyncCenter.shared
     @ObservedObject private var catalog = Catalog.shared
     @ObservedObject private var downloads = Downloads.shared
+    @ObservedObject private var nas = NasOps.shared
+    @State private var showNasLogin = false
     @Environment(\.dismiss) private var dismiss
     @State private var link = ""
     @State private var scanMessage: String?
@@ -104,6 +106,17 @@ struct SettingsView: View {
                     .disabled(ShareLink(string: link) == nil || ShareLink(string: link) == settings.share)
                 }
 
+                Section {
+                    if let a = nas.account {
+                        LabeledContent("로그인", value: a)
+                        Button("로그아웃", role: .destructive) { nas.logout() }
+                    } else {
+                        Button("NAS 계정으로 로그인") { showNasLogin = true }
+                    }
+                } header: { Text("올리기·삭제") } footer: {
+                    Text("폴더 화면 오른쪽 위 버튼으로 PDF·EPUB을 올리고, 책을 길게 눌러 ‘NAS에서 삭제’로 지울 수 있어요. 지운 파일은 Synology Drive 휴지통으로 가요.")
+                }
+
                 Section("서재") {
                     LabeledContent("책·시험지", value: "\(catalog.files.count)개")
                     if let d = catalog.updatedAt { LabeledContent("목록 갱신", value: d.formatted(date: .abbreviated, time: .shortened)) }
@@ -121,6 +134,7 @@ struct SettingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("완료") { dismiss() } } }
             .onAppear { link = settings.share?.text ?? "" }
+            .sheet(isPresented: $showNasLogin) { NasLoginView() }
             .confirmationDialog("기기에 받은 책 파일을 모두 지울까요? 읽은 기록과 형광펜은 남아요.", isPresented: $confirmClear, titleVisibility: .visible) {
                 Button("모두 지우기", role: .destructive) {
                     try? FileManager.default.removeItem(at: Paths.books)

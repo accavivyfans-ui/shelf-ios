@@ -151,6 +151,8 @@ struct BookMenu: View {
         if ReadingStore.shared.existing(file.path) != nil {
             Button(role: .destructive) { ReadingStore.shared.forget(file.path) } label: { Label("최근 목록에서 빼기", systemImage: "clock.arrow.circlepath") }
         }
+        Divider()
+        Button(role: .destructive) { NasOps.shared.requestDelete(file) } label: { Label("NAS에서 삭제", systemImage: "trash.slash") }
     }
 }
 

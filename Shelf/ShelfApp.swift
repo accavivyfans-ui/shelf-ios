@@ -23,6 +23,7 @@ struct ShelfApp: App {
 struct RootView: View {
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var opener = Opener.shared
+    @ObservedObject private var nas = NasOps.shared
     @State private var tab = 0
 
     var body: some View {
@@ -42,6 +43,15 @@ struct RootView: View {
                 SearchView()
                     .tabItem { Label("검색", systemImage: "magnifyingglass") }
                     .tag(3)
+            }
+            .overlay(alignment: .bottom) { NasStatusBar() }
+            .sheet(isPresented: $nas.showLogin) { NasLoginView() }
+            .confirmationDialog(nas.pendingDelete.map { "‘\($0.name)’을(를) NAS에서 지울까요?" } ?? "",
+                                isPresented: Binding(get: { nas.pendingDelete != nil }, set: { if !$0 { nas.pendingDelete = nil } }),
+                                titleVisibility: .visible, presenting: nas.pendingDelete) { f in
+                Button("NAS에서 삭제", role: .destructive) { nas.delete(f) }
+            } message: { _ in
+                Text("Synology Drive 휴지통으로 옮겨져요. 이 기기에 받은 파일과 읽은 기록도 지워져요.")
             }
             .fullScreenCover(item: $opener.file) { f in
                 ReaderScreen(file: f)

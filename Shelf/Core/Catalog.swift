@@ -151,17 +151,20 @@ final class Catalog: ObservableObject {
     @Published var error: String?
 
     private(set) var byPath: [String: BookFile] = [:]
+    /// Books-relative folder path → Drive folder id ("" is the books folder itself).
+    private(set) var folders: [String: String] = [:]
     private(set) var exams: [ExamPaper] = []
     private(set) var answersBySession: [String: [ExamPaper]] = [:]
 
     private var cacheURL: URL { Paths.support.appendingPathComponent("catalog.json") }
 
-    private struct Cache: Codable { var rootId: String?; var files: [BookFile]; var date: Date }
+    private struct Cache: Codable { var rootId: String?; var files: [BookFile]; var date: Date; var folders: [String: String]? }
 
     private init() {
         if let data = try? Data(contentsOf: cacheURL), let c = try? JSONDecoder().decode(Cache.self, from: data) {
             rootId = c.rootId
             updatedAt = c.date
+            folders = c.folders ?? [:]
             apply(c.files)
         }
     }
@@ -211,6 +214,8 @@ final class Catalog: ObservableObject {
             do {
                 let root = try await resolveRoot()
                 var result: [BookFile] = []
+                var dirs: [String: String] = [:]
+                if let root { dirs[""] = root }
                 var queue: [(String?, String)] = [(root, "")]
                 while !queue.isEmpty {
                     let batch = Array(queue.prefix(8))
@@ -227,7 +232,7 @@ final class Catalog: ObservableObject {
                         for it in items {
                             let p = prefix.isEmpty ? it.name : prefix + "/" + it.name
                             if it.isDir {
-                                if !it.name.hasPrefix(".") { queue.append((it.id, p)) }
+                                if !it.name.hasPrefix(".") { queue.append((it.id, p)); dirs[p] = it.id }
                             } else {
                                 let f = BookFile(id: it.id, path: p, size: it.size, modified: it.modified)
                                 if f.kind != nil { result.append(f) }
@@ -238,15 +243,53 @@ final class Catalog: ObservableObject {
                 }
                 result.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
                 apply(result)
+                folders = dirs
                 updatedAt = Date()
-                if let data = try? JSONEncoder().encode(Cache(rootId: rootId, files: result, date: Date())) {
-                    try? data.write(to: cacheURL, options: .atomic)
-                }
+                saveCache()
             } catch {
                 self.error = error.localizedDescription
             }
             indexing = false
         }
+    }
+
+    private func saveCache() {
+        if let data = try? JSONEncoder().encode(Cache(rootId: rootId, files: files, date: updatedAt ?? Date(), folders: folders)) {
+            try? data.write(to: cacheURL, options: .atomic)
+        }
+    }
+
+    /// Adds (or replaces, for a re-upload of the same path) a file without re-indexing the share.
+    func insert(_ f: BookFile) {
+        guard f.kind != nil else { return }
+        var list = files.filter { $0.path != f.path && $0.id != f.id }
+        list.append(f)
+        list.sort { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+        apply(list)
+        saveCache()
+    }
+
+    func remove(ids: Set<String>) {
+        apply(files.filter { !ids.contains($0.id) })
+        saveCache()
+    }
+
+    /// Drive id of a books-relative folder, walking down from the books folder when the index lacks it.
+    func folderId(for path: String) async throws -> String {
+        if let id = folders[path] { return id }
+        guard let root = try await resolveRoot() else { throw DriveError.noShare }
+        if path.isEmpty { folders[""] = root; return root }
+        var current = root
+        var walked = ""
+        for part in path.split(separator: "/").map(String.init) {
+            walked = walked.isEmpty ? part : walked + "/" + part
+            if let id = folders[walked] { current = id; continue }
+            let subs = try await NasClient.shared.listFolders(current)
+            guard let next = subs.first(where: { $0.name == part }) else { throw NasError.task("NAS에서 ‘\(walked)’ 폴더를 찾지 못했어요. 서재 목록을 새로고침해 주세요.") }
+            folders[walked] = next.id
+            current = next.id
+        }
+        return current
     }
 
     func search(_ q: String, limit: Int = 300) -> [BookFile] {

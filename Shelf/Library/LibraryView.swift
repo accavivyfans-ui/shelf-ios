@@ -118,6 +118,7 @@ struct ShelfView: View {
                     Toggle(isOn: $settings.gridStyle) { Label("표지로 보기", systemImage: "square.grid.2x2") }
                 } label: { Image(systemName: "line.3.horizontal.decrease.circle") }
             }
+            ToolbarItem(placement: .navigationBarTrailing) { UploadButton(folder: folder) }
         }
     }
 }
@@ -152,9 +153,21 @@ struct FolderView: View {
                     }
                 }
             }
-            ForEach(files) { BookRow(file: $0, subtitle: $0.name) }
+            ForEach(files) { f in
+                BookRow(file: f, subtitle: f.name)
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) { NasOps.shared.requestDelete(f) } label: { Label("삭제", systemImage: "trash") }
+                    }
+            }
         }
         .listStyle(.plain)
+        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { UploadButton(folder: path) } }
+        .overlay {
+            if dirs.isEmpty && files.isEmpty {
+                Text("비어 있는 폴더예요.\n오른쪽 위 버튼으로 PDF·EPUB을 올릴 수 있어요.").multilineTextAlignment(.center)
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+        }
         .navigationTitle(path.isEmpty ? "books" : (path as NSString).lastPathComponent)
         .navigationBarTitleDisplayMode(.inline)
     }
