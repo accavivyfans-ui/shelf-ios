@@ -69,7 +69,9 @@ class ReaderModel: NSObject, ObservableObject {
     // MARK: Shared bookkeeping
 
     func record(page: Int, pageCount: Int, ratio: Double = 0, percent: Double) {
-        let changed = page != state.page || abs(ratio - state.ratio) > 0.0001 || pageCount != state.pageCount
+        let newPercent = (percent * 10).rounded() / 10
+        let changed = page != state.page || abs(ratio - state.ratio) > 0.0001 || pageCount != state.pageCount || abs(newPercent - state.percent) > 0.05
+        ReadingStore.shared.logPage(state.path, page * 1000 + Int(ratio * 100))
         state.page = page
         state.pageCount = pageCount
         state.ratio = ratio
@@ -80,7 +82,6 @@ class ReaderModel: NSObject, ObservableObject {
         state.updated = Date()
         state.lastOpened = Date()
         ReadingStore.shared.put(state)
-        ReadingStore.shared.logPage(state.path, page * 1000 + Int(ratio * 100))
         SyncCenter.shared.progressChanged(state.path)
     }
 
