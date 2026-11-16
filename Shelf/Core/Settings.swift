@@ -8,7 +8,8 @@ struct ShareLink: Codable, Equatable {
     var sharing: String
 
     init?(string: String) {
-        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Pasted links often pick up line breaks or spaces where a chat wrapped them.
+        let trimmed = string.components(separatedBy: .whitespacesAndNewlines).joined()
         guard let url = URL(string: trimmed), let host = url.host, let scheme = url.scheme else { return nil }
         let parts = url.path.split(separator: "/").map(String.init)
         guard let i = parts.firstIndex(of: "s"), i > 0, parts[i - 1] == "d", parts.count >= i + 3 else { return nil }
