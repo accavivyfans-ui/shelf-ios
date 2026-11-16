@@ -98,6 +98,7 @@ struct ShelfView: View {
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                SearchField(text: $query, prompt: "이 서재에서 찾기").padding(.horizontal)
                 if subjects.count > 2 { Chips(items: subjects, selection: $subject) { $0 } }
                 if settings.gridStyle {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 16, alignment: .top)], spacing: 22) {
@@ -113,7 +114,7 @@ struct ShelfView: View {
             }
             .padding(.vertical)
         }
-        .searchable(text: $query, prompt: "이 서재에서 찾기")
+        .scrollDismissesKeyboard(.immediately)
         .navigationTitle(folder.replacingOccurrences(of: "_", with: " "))
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -168,27 +169,49 @@ struct FolderView: View {
     }
 }
 
+struct SearchField: View {
+    @Binding var text: String
+    var prompt: String
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField(prompt, text: $text)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+            if !text.isEmpty {
+                Button { text = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+            }
+        }
+        .padding(10)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
 struct SearchView: View {
     @ObservedObject private var catalog = Catalog.shared
     @State private var query = ""
 
     var body: some View {
         NavigationStack {
-            List {
-                if query.isEmpty {
-                    Section {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    SearchField(text: $query, prompt: "모든 책과 시험지 검색")
+                    if query.isEmpty {
                         Text("제목, 과목, 연도, 폴더 이름으로 찾을 수 있어요. 여러 단어는 띄어 쓰세요.\n예) 2024 수능 국어 · 화학 정답 · 불편한 편의점")
                             .font(.footnote).foregroundStyle(.secondary)
-                    }
-                } else {
-                    let results = catalog.search(query)
-                    Section("\(results.count >= 300 ? "300+" : "\(results.count)")개") {
-                        ForEach(results) { BookRow(file: $0) }
+                    } else {
+                        let results = catalog.search(query)
+                        Text(results.count >= 300 ? "300개 이상" : "\(results.count)개").font(.footnote).foregroundStyle(.secondary)
+                        ForEach(results) { f in
+                            BookRow(file: f)
+                            Divider()
+                        }
                     }
                 }
+                .padding()
             }
-            .listStyle(.plain)
-            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "모든 책과 시험지 검색")
+            .scrollDismissesKeyboard(.immediately)
             .navigationTitle("검색")
         }
     }

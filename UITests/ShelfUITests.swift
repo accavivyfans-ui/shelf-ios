@@ -53,7 +53,7 @@ final class ShelfUITests: XCTestCase {
         }
 
         app.tabBars.buttons["검색"].tap()
-        let field = app.searchFields.firstMatch
+        let field = app.textFields.firstMatch
         if field.waitForExistence(timeout: 5) {
             field.tap()
             field.typeText("불편한 편의점\n")
