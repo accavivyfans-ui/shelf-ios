@@ -98,7 +98,7 @@ final class EpubReaderModel: ReaderModel, WKNavigationDelegate, UIScrollViewDele
         if entries.isEmpty { entries = b.chapters.map { TocEntry(label: $0.title, depth: 0, page: $0.index + 1, pageLabel: "\($0.index + 1)장") } }
         chapter = max(0, min(b.chapters.count - 1, state.page - 1))
         pending = .ratio(state.ratio)
-        state.pageCount = b.chapters.count
+        self.state.pageCount = b.chapters.count
         applyAppearance()
     }
 
