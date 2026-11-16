@@ -1,11 +1,23 @@
 import SwiftUI
+import UIKit
 
 /// Opens a book full screen from anywhere.
 @MainActor
 final class Opener: ObservableObject {
     static let shared = Opener()
     @Published var file: BookFile?
-    func open(_ f: BookFile) { file = f }
+    /// An active search bar is itself presented modally, which blocks our full-screen
+    /// reader, so close it first.
+    func open(_ f: BookFile) {
+        let window = UIApplication.shared.connectedScenes.compactMap { ($0 as? UIWindowScene)?.keyWindow }.first
+        var top = window?.rootViewController
+        while let next = top?.presentedViewController { top = next }
+        if let search = top as? UISearchController {
+            search.dismiss(animated: true) { self.file = f }
+            return
+        }
+        file = f
+    }
 }
 
 struct BookCover: View {
