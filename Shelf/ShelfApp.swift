@@ -46,6 +46,7 @@ struct RootView: View {
             }
             .overlay(alignment: .bottom) { NasStatusBar() }
             .sheet(isPresented: $nas.showLogin) { NasLoginView() }
+            .fileImporter(isPresented: $nas.picking, allowedContentTypes: [.pdf, .epub], allowsMultipleSelection: true) { nas.picked($0) }
             .confirmationDialog(nas.pendingDelete.map { "‘\($0.name)’을(를) NAS에서 지울까요?" } ?? "",
                                 isPresented: Binding(get: { nas.pendingDelete != nil }, set: { if !$0 { nas.pendingDelete = nil } }),
                                 titleVisibility: .visible, presenting: nas.pendingDelete) { f in

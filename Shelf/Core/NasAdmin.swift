@@ -226,6 +226,22 @@ final class NasOps: ObservableObject {
     @Published var pendingDelete: BookFile?
     @Published private(set) var uploads: [Upload] = []
     @Published var message: String?
+    /// One file picker for the whole app (a picker inside a toolbar button never reports the chosen files).
+    @Published var picking = false
+    private(set) var pickTarget = ""
+
+    func pickFiles(into folder: String) {
+        guard loggedIn else { showLogin = true; return }
+        pickTarget = folder
+        picking = true
+    }
+
+    func picked(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls): upload(urls, to: pickTarget)
+        case .failure(let e): message = "파일을 열지 못했어요: \(e.localizedDescription)"
+        }
+    }
 
     struct Upload: Identifiable, Equatable {
         let id = UUID()
@@ -251,25 +267,43 @@ final class NasOps: ObservableObject {
     /// Uploads picked files (security-scoped URLs from the Files picker) into a books-relative folder.
     func upload(_ urls: [URL], to folder: String) {
         guard loggedIn else { showLogin = true; return }
+        if urls.isEmpty { message = "선택한 파일이 없어요." }
         for url in urls {
             let name = url.lastPathComponent
-            let item = Upload(name: name)
+            var item = Upload(name: name)
+            // Copy now, while the picker's permission is valid (it can end once the picker is gone).
+            let scoped = url.startAccessingSecurityScopedResource()
+            let local = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+            var copy: URL?
+            do {
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+                    throw NasError.task("이 EPUB은 폴더 형태라 올릴 수 없어요. 책 앱이 아닌 다른 곳에서 받은 .epub 파일을 골라 주세요.")
+                }
+                try FileManager.default.createDirectory(at: local, withIntermediateDirectories: true)
+                let target = local.appendingPathComponent(name)
+                try FileManager.default.copyItem(at: url, to: target)
+                copy = target
+            } catch {
+                item.failed = error.localizedDescription
+            }
+            if scoped { url.stopAccessingSecurityScopedResource() }
             uploads.append(item)
+            guard let copy else { continue }
+            let id = item.id
             Task {
+                defer { try? FileManager.default.removeItem(at: local) }
                 do {
-                    let scoped = url.startAccessingSecurityScopedResource()
-                    defer { if scoped { url.stopAccessingSecurityScopedResource() } }
                     let folderId = try await Catalog.shared.folderId(for: folder)
-                    let id = item.id
-                    let done = try await NasClient.shared.upload(file: url, name: name, folderId: folderId) { p in
+                    let done = try await NasClient.shared.upload(file: copy, name: name, folderId: folderId) { p in
                         Task { @MainActor in NasOps.shared.setProgress(id, p) }
                     }
                     let path = folder.isEmpty ? done.name : folder + "/" + done.name
                     Catalog.shared.insert(BookFile(id: done.id, path: path, size: done.size, modified: done.modified))
-                    uploads.removeAll { $0.id == item.id }
+                    uploads.removeAll { $0.id == id }
                     message = "‘\(done.name)’ 올렸어요."
                 } catch {
-                    if let i = uploads.firstIndex(where: { $0.id == item.id }) { uploads[i].failed = error.localizedDescription }
+                    if let i = uploads.firstIndex(where: { $0.id == id }) { uploads[i].failed = error.localizedDescription }
                     if case NasError.notLoggedIn = error { showLogin = true }
                 }
             }
@@ -387,15 +421,9 @@ struct NasStatusBar: View {
 struct UploadButton: View {
     let folder: String
     @ObservedObject private var ops = NasOps.shared
-    @State private var picking = false
 
     var body: some View {
-        Button {
-            if ops.loggedIn { picking = true } else { ops.showLogin = true }
-        } label: { Image(systemName: "square.and.arrow.up") }
+        Button { ops.pickFiles(into: folder) } label: { Image(systemName: "square.and.arrow.up") }
         .accessibilityLabel("이 폴더에 올리기")
-        .fileImporter(isPresented: $picking, allowedContentTypes: [.pdf, .epub], allowsMultipleSelection: true) { result in
-            if case .success(let urls) = result { ops.upload(urls, to: folder) }
-        }
     }
 }
