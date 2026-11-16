@@ -7,11 +7,11 @@ struct RecentItem: Identifiable {
     var id: String { file.path }
 }
 
+/// "읽는 중" tab: what I'm reading now, as a list.
 struct HomeView: View {
     @ObservedObject private var store = ReadingStore.shared
     @ObservedObject private var sync = SyncCenter.shared
     @ObservedObject private var catalog = Catalog.shared
-    @ObservedObject private var downloads = Downloads.shared
     @State private var showSettings = false
 
     private var recent: [RecentItem] {
@@ -29,70 +29,54 @@ struct HomeView: View {
         return map.values.sorted { $0.date > $1.date }
     }
 
-    private var downloaded: [BookFile] {
-        _ = downloads.revision
-        let ids = downloads.downloadedIds()
-        return catalog.files.filter { ids.contains($0.id) }
-    }
-
     var body: some View {
+        let items = recent
+        let reading = items.filter { store.existing($0.file.path)?.finished != true }
+        let finished = items.filter { store.existing($0.file.path)?.finished == true }
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 26) {
-                    IndexingBanner()
-                    let items = recent
-                    if let first = items.first {
-                        ContinueCard(file: first.file, fromWeb: first.fromWeb)
-                            .padding(.horizontal)
-                    } else {
-                        EmptyHome()
-                    }
+            List {
+                Section {
+                    IndexingBanner().listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
                     StatsStrip()
-                        .padding(.horizontal)
-                    if items.count > 1 {
-                        section("최근 읽은 책") {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                LazyHStack(alignment: .top, spacing: 16) {
-                                    ForEach(items.dropFirst().prefix(30)) { BookTile(file: $0.file) }
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                        .listRowBackground(Color.clear)
+                    if let first = reading.first {
+                        ContinueCard(file: first.file, fromWeb: first.fromWeb)
+                            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                            .listRowBackground(Color.clear)
                     }
-                    let finished = store.states.values.filter(\.finished)
-                    if !downloaded.isEmpty {
-                        section("기기에 받은 책 \(downloaded.count)") {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                LazyHStack(alignment: .top, spacing: 16) {
-                                    ForEach(downloaded) { BookTile(file: $0) }
+                }
+                if reading.isEmpty {
+                    Section { EmptyHome().listRowBackground(Color.clear) }
+                } else {
+                    Section("읽는 중 \(reading.count)권") {
+                        ForEach(reading) { item in
+                            BookRow(file: item.file, subtitle: subtitle(item))
+                                .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) { store.forget(item.file.path) } label: { Label("빼기", systemImage: "minus.circle") }
+                                    Button { store.update(item.file.path) { $0.finished = true } } label: { Label("다 읽음", systemImage: "checkmark") }.tint(.green)
                                 }
-                                .padding(.horizontal)
-                            }
-                        }
-                    }
-                    if !finished.isEmpty {
-                        section("다 읽은 책 \(finished.count)") {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                LazyHStack(alignment: .top, spacing: 16) {
-                                    ForEach(finished.sorted { $0.lastOpened > $1.lastOpened }) { BookTile(file: catalog.byPath[$0.path] ?? $0.file) }
-                                }
-                                .padding(.horizontal)
-                            }
                         }
                     }
                 }
-                .padding(.vertical)
+                if !finished.isEmpty {
+                    Section("다 읽은 책 \(finished.count)권") {
+                        ForEach(finished) { item in
+                            BookRow(file: item.file, subtitle: subtitle(item))
+                                .swipeActions(edge: .trailing) {
+                                    Button { store.update(item.file.path) { $0.finished = false } } label: { Label("다시 읽기", systemImage: "arrow.uturn.backward") }.tint(.orange)
+                                }
+                        }
+                    }
+                }
             }
-            .navigationTitle("지금 읽기")
+            .listStyle(.insetGrouped)
+            .navigationTitle("읽는 중")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { showSettings = true } label: {
-                        Image(systemName: sync.online ? "gearshape" : "gearshape.fill")
-                    }
+                    Button { showSettings = true } label: { Image(systemName: "gearshape") }
                 }
-                ToolbarItem(placement: .navigationBarLeading) {
-                    SyncBadge()
-                }
+                ToolbarItem(placement: .navigationBarLeading) { SyncBadge() }
             }
             .refreshable {
                 await sync.refresh(force: true)
@@ -102,11 +86,18 @@ struct HomeView: View {
         }
     }
 
-    private func section<C: View>(_ title: String, @ViewBuilder content: () -> C) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title).font(.title3.weight(.bold)).padding(.horizontal)
-            content()
+    private func subtitle(_ item: RecentItem) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.doesRelativeDateFormatting = true
+        f.dateStyle = .short
+        f.timeStyle = .short
+        var s = f.string(from: item.date)
+        if item.fromWeb { s += " · 웹에서 읽음" }
+        if let st = store.existing(item.file.path), st.percent > 0 {
+            s += st.kind == .pdf ? " · \(st.page)/\(st.pageCount)쪽" : " · \(st.page)장"
         }
+        return s
     }
 }
 

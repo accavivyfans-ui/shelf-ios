@@ -30,10 +30,10 @@ final class ShelfUITests: XCTestCase {
         shot("01-home-indexing")
         waitIndexed()
         app.tabBars.buttons["서재"].tap()
-        sleep(6)
+        sleep(3)
         shot("02-library")
-        sleep(25)
-        shot("02b-library-covers")
+        let shelf = app.buttons.containing(NSPredicate(format: "label CONTAINS '고등교과서'")).firstMatch
+        if shelf.waitForExistence(timeout: 5) { shelf.tap(); sleep(20); shot("02b-shelf-list"); app.navigationBars.buttons.firstMatch.tap(); sleep(1) }
 
         app.tabBars.buttons["기출"].tap()
         sleep(2)
@@ -50,6 +50,9 @@ final class ShelfUITests: XCTestCase {
             if !close.exists { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap(); sleep(2) }
             if close.exists { close.tap() }
             sleep(3)
+            app.tabBars.buttons["읽는 중"].tap()
+            sleep(2)
+            shot("05b-reading-tab")
         }
 
         app.tabBars.buttons["검색"].tap()

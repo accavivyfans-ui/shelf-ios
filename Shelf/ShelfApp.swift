@@ -31,7 +31,7 @@ struct RootView: View {
         } else {
             TabView(selection: $tab) {
                 HomeView()
-                    .tabItem { Label("지금 읽기", systemImage: "book.fill") }
+                    .tabItem { Label("읽는 중", systemImage: "book.fill") }
                     .tag(0)
                 LibraryView()
                     .tabItem { Label("서재", systemImage: "books.vertical.fill") }

@@ -118,7 +118,7 @@ final class AppSettings: ObservableObject {
         epubFontSize = d.object(forKey: "epubFontSize") as? Double ?? 18
         epubLineHeight = d.object(forKey: "epubLineHeight") as? Double ?? 1.7
         epubMargin = d.object(forKey: "epubMargin") as? Double ?? 24
-        gridStyle = d.object(forKey: "gridStyle") as? Bool ?? true
+        gridStyle = d.object(forKey: "gridStyle") as? Bool ?? false
         loading = false
     }
 

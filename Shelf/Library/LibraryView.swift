@@ -1,9 +1,8 @@
 import SwiftUI
 
-/// Top level of the share as bookshelves, plus a raw folder view.
+/// Top level of the share as a list of shelves.
 struct LibraryView: View {
     @ObservedObject private var catalog = Catalog.shared
-    @ObservedObject private var settings = AppSettings.shared
 
     private var shelves: [(name: String, files: [BookFile])] {
         let groups = Dictionary(grouping: catalog.files.filter { $0.topFolder != "기출문제" && $0.topFolder != "기출정답" }, by: \.topFolder)
@@ -16,53 +15,45 @@ struct LibraryView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    IndexingBanner()
-                    let examCount = catalog.exams.count
-                    if examCount > 0 {
-                        NavigationLink { ExamFinderView() } label: {
-                            HStack(spacing: 14) {
-                                Image(systemName: "list.clipboard").font(.title2).foregroundStyle(.white)
-                                    .frame(width: 50, height: 50).background(Color.indigo, in: RoundedRectangle(cornerRadius: 12))
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("기출문제 찾기").font(.headline).foregroundStyle(.primary)
-                                    Text("수능·모의평가·학력평가 \(examCount)개 · 연도/과목별, 정답 바로 연결").font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right").foregroundStyle(.tertiary)
-                            }
-                            .padding(14)
-                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
-                        }
-                        .padding(.horizontal)
-                    }
+            List {
+                if catalog.indexing || catalog.error != nil {
+                    IndexingBanner().listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
+                }
+                Section("서재") {
                     ForEach(shelves, id: \.name) { shelf in
-                        VStack(alignment: .leading, spacing: 10) {
-                            NavigationLink { ShelfView(folder: shelf.name) } label: {
-                                HStack {
-                                    Text(shelf.name.replacingOccurrences(of: "_", with: " ")).font(.title3.weight(.bold)).foregroundStyle(.primary)
-                                    Text("\(shelf.files.count)").font(.subheadline).foregroundStyle(.secondary)
-                                    Spacer()
-                                    Text("모두 보기").font(.subheadline)
-                                    Image(systemName: "chevron.right").font(.caption)
-                                }
-                            }
-                            .padding(.horizontal)
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                LazyHStack(alignment: .top, spacing: 16) {
-                                    ForEach(shelf.files.prefix(24)) { BookTile(file: $0) }
-                                }
-                                .padding(.horizontal)
+                        NavigationLink { ShelfView(folder: shelf.name) } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: shelf.name == "책" ? "book.closed.fill" : "books.vertical.fill")
+                                    .foregroundStyle(.orange).frame(width: 28)
+                                Text(shelf.name.replacingOccurrences(of: "_", with: " "))
+                                Spacer()
+                                Text("\(shelf.files.count)권").font(.subheadline).foregroundStyle(.secondary)
                             }
                         }
-                    }
-                    NavigationLink { FolderView(path: "") } label: {
-                        Label("폴더 그대로 보기", systemImage: "folder").padding(.horizontal)
                     }
                 }
-                .padding(.vertical)
+                if catalog.exams.count > 0 {
+                    Section("시험지") {
+                        NavigationLink { ExamFinderView() } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "list.clipboard").foregroundStyle(.indigo).frame(width: 28)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("기출문제 찾기")
+                                    Text("연도·과목별, 정답 바로 연결").font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text("\(catalog.exams.count)개").font(.subheadline).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                Section {
+                    NavigationLink { FolderView(path: "") } label: {
+                        Label("폴더 그대로 보기", systemImage: "folder")
+                    }
+                }
             }
+            .listStyle(.insetGrouped)
             .navigationTitle("서재")
             .refreshable { catalog.refresh() }
         }
