@@ -50,6 +50,8 @@ class ReaderModel: NSObject, ObservableObject {
     func go(_ entry: TocEntry) {}
     func go(page: Int) {}
     func go(fraction: Double) {}
+    /// Where a scrub to `fraction` would land, shown live while dragging the slider.
+    func scrubLabel(_ fraction: Double) -> String { "\(Int(fraction * 100))%" }
     func go(_ hit: SearchHit) {}
     func search(_ q: String) {}
     func cancelSearch() {}

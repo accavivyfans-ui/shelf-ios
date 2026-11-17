@@ -261,15 +261,26 @@ struct ReaderBody: View {
 
             // Bottom bar
             VStack(spacing: 8) {
-                if let pdf {
-                    PDFScrubber(model: pdf).frame(height: 40)
-                }
                 Slider(value: Binding(get: { scrubbing ?? model.progressFraction }, set: { scrubbing = $0 }), in: 0...1, onEditingChanged: { editing in
                     if !editing, let s = scrubbing { model.go(fraction: s); scrubbing = nil }
                 })
                 .tint(.accentColor)
+                .overlay(alignment: .top) {
+                    if let s = scrubbing {
+                        GeometryReader { geo in
+                            Text(model.scrubLabel(s))
+                                .font(.subheadline.weight(.semibold).monospacedDigit())
+                                .padding(.horizontal, 12).padding(.vertical, 6)
+                                .background(.thickMaterial, in: Capsule())
+                                .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
+                                .fixedSize()
+                                .position(x: min(max(geo.size.width * s, 70), geo.size.width - 70), y: -24)
+                        }
+                        .allowsHitTesting(false)
+                    }
+                }
                 HStack {
-                    Text(scrubbing.map { "\(Int($0 * 100))%" } ?? model.pageText).font(.caption.monospacedDigit())
+                    Text(scrubbing.map { model.scrubLabel($0) } ?? model.pageText).font(.caption.monospacedDigit())
                     Spacer()
                     Text("\(Int(model.progressFraction * 100))% · \(model.detailText)").font(.caption).foregroundStyle(.secondary)
                 }

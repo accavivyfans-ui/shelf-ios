@@ -205,6 +205,12 @@ final class PDFReaderModel: ReaderModel, PDFDocumentDelegate {
         go(page: Int((fraction * Double(document.pageCount)).rounded(.up)).clamped(1, document.pageCount))
     }
 
+    override func scrubLabel(_ fraction: Double) -> String {
+        let count = max(1, document.pageCount)
+        let page = Int((fraction * Double(count)).rounded(.up)).clamped(1, count)
+        return "\(page) / \(count)쪽 · \(Int((Double(page) / Double(count) * 100).rounded()))%"
+    }
+
     override func applyRemote(_ rp: RemoteProgress) {
         go(page: rp.page ?? Int(rp.position) ?? state.page)
     }
@@ -414,17 +420,4 @@ struct PDFHost: UIViewRepresentable {
     let model: PDFReaderModel
     func makeUIView(context: Context) -> PDFHostView { model.host }
     func updateUIView(_ uiView: PDFHostView, context: Context) {}
-}
-
-struct PDFScrubber: UIViewRepresentable {
-    let model: PDFReaderModel
-    func makeUIView(context: Context) -> PDFThumbnailView {
-        let v = PDFThumbnailView()
-        v.pdfView = model.pdfView
-        v.layoutMode = .horizontal
-        v.thumbnailSize = CGSize(width: 22, height: 30)
-        v.backgroundColor = .clear
-        return v
-    }
-    func updateUIView(_ uiView: PDFThumbnailView, context: Context) {}
 }

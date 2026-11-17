@@ -285,6 +285,12 @@ final class EpubReaderModel: ReaderModel, WKNavigationDelegate, UIScrollViewDele
         load(page - 1)
     }
 
+    override func scrubLabel(_ fraction: Double) -> String {
+        let count = max(1, book.chapters.count)
+        let ch = min(count - 1, max(0, Int(fraction * Double(count))))
+        return "\(ch + 1) / \(count)장 · \(Int((fraction * 100).rounded()))%"
+    }
+
     override func go(fraction: Double) {
         let count = Double(book.chapters.count)
         let pos = min(count - 0.0001, max(0, fraction * count))
